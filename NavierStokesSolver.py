@@ -289,7 +289,10 @@ class NavierStokesSolver:
 		self.initVecs()
 		self.initMatrices()
 		if folder:
-			os.mkdir(folder)
+			try:
+				os.mkdir(folder)
+			except:
+				pass
 			self.writeData(0, folder)
 		for n in xrange(1,nt+1):
 			self.stepTime()
