@@ -9,6 +9,9 @@ import os
 def outside(x, y):
 	return (x-np.pi)**2 + (y-np.pi)**2 >= (np.pi/2.)**2
 
+def inside(x, y):
+	return (x-np.pi)**2 + (y-np.pi)**2 <= (np.pi/2.)**2
+
 def pointOfIntersectionX(xLeft, xRight, y):
 	x0 = np.pi + np.sqrt((np.pi/2.)**2 - (y-np.pi)**2)
 	x1 = np.pi - np.sqrt((np.pi/2.)**2 - (y-np.pi)**2)
@@ -26,9 +29,10 @@ def pointOfIntersectionY(yBottom, yTop, x):
 		return y1
 
 class DirectForcingSolver(NavierStokesSolver):
-	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.01, dt=-1.0, order='linear'):
+	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.01, dt=-1.0, order='linear', side='outside'):
 		NavierStokesSolver.__init__(self, N, alphaImplicit, alphaExplicit, gamma, zeta, nu, dt)
 		self.order = order
+		self.side = side
 
 	def initVecs(self):
 		NavierStokesSolver.initVecs(self)
@@ -59,7 +63,10 @@ class DirectForcingSolver(NavierStokesSolver):
 				self.xv[i] = (i+0.5)*h
 
 	def tagPoints(self):
-		self.tagOutsidePoints()
+		if self.side =='outside':
+			self.tagOutsidePoints()
+		if self.side =='inside':
+			self.tagInsidePoints()
 
 	def tagOutsidePoints(self):
 		N = self.N
@@ -104,6 +111,58 @@ class DirectForcingSolver(NavierStokesSolver):
 					self.tagsY[index] = index+2*N
 					self.coeffsY[index] = (self.yv[j]-y)/(self.yv[j+1]-y)
 				elif outside(self.xv[i], self.yv[j]) and not outside(self.xv[i], self.yv[j+1]):
+					y = pointOfIntersectionY(self.yv[j], self.yv[j+1], self.xv[i])
+					self.tagsY[index] = index-2*N
+					self.coeffsY[index] = (self.yv[j]-y)/(self.yv[j-1]-y)
+
+		#print np.reshape(self.tagsX[::2], (N,N))
+		#print np.reshape(self.tagsX[1::2], (N,N))
+		#print np.reshape(self.tagsY[::2], (N,N))
+		#print np.reshape(self.tagsY[1::2], (N,N))
+
+	def tagInsidePoints(self):
+		N = self.N
+		h = self.h
+		for j in xrange(1,N-1):
+			for i in xrange(1,N-1):
+				index = 2*(j*N+i)
+				# tagsX
+				if inside(self.xu[i], self.yu[j]) and not inside(self.xu[i-1], self.yu[j]):
+					x = pointOfIntersectionX(self.xu[i-1], self.xu[i], self.yu[j])
+					self.tagsX[index] = index+2
+					self.coeffsX[index] = (self.xu[i]-x)/(self.xu[i+1]-x)
+				elif inside(self.xu[i], self.yu[j]) and not inside(self.xu[i+1], self.yu[j]):
+					x = pointOfIntersectionX(self.xu[i], self.xu[i+1], self.yu[j])
+					self.tagsX[index] = index-2
+					self.coeffsX[index] = (self.xu[i]-x)/(self.xu[i-1]-x)
+
+				# tagsY
+				if inside(self.xu[i], self.yu[j]) and not inside(self.xu[i], self.yu[j-1]):
+					y = pointOfIntersectionY(self.yu[j-1], self.yu[j], self.xu[i])
+					self.tagsY[index] = index+2*N
+					self.coeffsY[index] = (self.yu[j]-y)/(self.yu[j+1]-y)
+				elif inside(self.xu[i], self.yu[j]) and not inside(self.xu[i], self.yu[j+1]):
+					y = pointOfIntersectionY(self.yu[j], self.yu[j+1], self.xu[i])
+					self.tagsY[index] = index-2*N
+					self.coeffsY[index] = (self.yu[j]-y)/(self.yu[j-1]-y)
+
+				index+=1
+				# tagsX
+				if inside(self.xv[i], self.yv[j]) and not inside(self.xv[i-1], self.yv[j]):
+					x = pointOfIntersectionX(self.xv[i-1], self.xv[i], self.yv[j])
+					self.tagsX[index] = index+2
+					self.coeffsX[index] = (self.xv[i]-x)/(self.xv[i+1]-x)
+				elif inside(self.xv[i], self.yv[j]) and not inside(self.xv[i+1], self.yv[j]):
+					x = pointOfIntersectionX(self.xv[i], self.xv[i+1], self.yv[j])
+					self.tagsX[index] = index-2
+					self.coeffsX[index] = (self.xv[i]-x)/(self.xv[i-1]-x)
+
+				# tagsY
+				if inside(self.xv[i], self.yv[j]) and not inside(self.xv[i], self.yv[j-1]):
+					y = pointOfIntersectionY(self.yv[j-1], self.yv[j], self.xv[i])
+					self.tagsY[index] = index+2*N
+					self.coeffsY[index] = (self.yv[j]-y)/(self.yv[j+1]-y)
+				elif inside(self.xv[i], self.yv[j]) and not inside(self.xv[i], self.yv[j+1]):
 					y = pointOfIntersectionY(self.yv[j], self.yv[j+1], self.xv[i])
 					self.tagsY[index] = index-2*N
 					self.coeffsY[index] = (self.yv[j]-y)/(self.yv[j-1]-y)
@@ -243,8 +302,14 @@ class DirectForcingSolver(NavierStokesSolver):
 		self.BNQ = self.dt*self.BNQ
 
 if __name__ == "__main__":
-	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=0.1)
-	solver.runSimulation(nt=20, nsave=1, folder="test-linear")
+	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, side='inside')
+	solver.runSimulation(nt=20, nsave=1, folder="flow-linear-inside")
+
+	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant', side='inside')
+	solver.runSimulation(nt=20, nsave=1, folder="flow-constant-inside")
+
+	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi)
+	solver.runSimulation(nt=20, nsave=1, folder="flow-linear-outside")
 
 	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant')
-	solver.runSimulation(nt=20, nsave=1, folder="test-constant")
+	solver.runSimulation(nt=20, nsave=1, folder="flow-constant-outside")
