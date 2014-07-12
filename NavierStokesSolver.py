@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import os
 
 class NavierStokesSolver:
-	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.01, dt=-1.0):
+	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.1, dt=-1.0, folder="."):
 		self.nu = nu
 		self.N = N
 		self.h = 2*np.pi/N
@@ -20,6 +20,7 @@ class NavierStokesSolver:
 		self.alphaImplicit = alphaImplicit
 		self.gamma = gamma
 		self.zeta = zeta
+		self.folder = folder
 
 	def initVecs(self):
 		N = self.N
@@ -253,7 +254,7 @@ class NavierStokesSolver:
 		# projection step
 		self.q = self.qStar - self.BNQ*self.phi
 
-	def writeData(self, n, folder):
+	def writeData(self, n):
 		h = self.h
 		N = self.N
 
@@ -268,7 +269,7 @@ class NavierStokesSolver:
 		plt.colorbar(CS)
 		plt.axis([0, 2*np.pi, 0, 2*np.pi])
 		plt.gca().set_aspect('equal', adjustable='box')
-		plt.savefig("%s/u%07d.png" % (folder,n))
+		plt.savefig("%s/u%07d.png" % (self.folder,n))
 		plt.clf()
 
 		V = np.zeros(N*N)
@@ -282,37 +283,31 @@ class NavierStokesSolver:
 		plt.colorbar(CS)
 		plt.axis([0, 2*np.pi, 0, 2*np.pi])
 		plt.gca().set_aspect('equal', adjustable='box')
-		plt.savefig("%s/v%07d.png" % (folder, n))
+		plt.savefig("%s/v%07d.png" % (self.folder, n))
 		plt.clf()
 
-	def runSimulation(self, nt=20, nsave=1, folder=""):
+	def runSimulation(self, nt=20, nsave=1, plot=True):
+		try:
+			os.mkdir(self.folder)
+		except:
+			pass
 		self.initVecs()
 		self.initMatrices()
-		if folder:
-			try:
-				os.mkdir(folder)
-			except:
-				pass
-			self.writeData(0, folder)
+		if plot:
+			self.writeData(0)
 		for n in xrange(1,nt+1):
 			self.stepTime()
-			if(n%nsave==0 and folder):
-				self.writeData(n, folder)
+			if n%nsave==0 and plot:
+				self.writeData(n)
 
 if __name__ == "__main__":
-	NT = 50
+	NT = 20
 
-	solver = NavierStokesSolver(N=6, alphaExplicit=0., alphaImplicit=1., dt=0.1)
+	solver = NavierStokesSolver(N=6, alphaExplicit=0., alphaImplicit=1., dt=0.1, folder="NS06")
 	solver.runSimulation(nt=NT)
-	solver.exactSolutionTaylorGreen(solver.dt*NT)
-	print la.norm(solver.q - solver.exactSolution)/la.norm(solver.exactSolution)
 
-	solver = NavierStokesSolver(N=12, alphaExplicit=0., alphaImplicit=1., dt=0.1)
+	solver = NavierStokesSolver(N=12, alphaExplicit=0., alphaImplicit=1., dt=0.1, folder="NS12")
 	solver.runSimulation(nt=NT)
-	solver.exactSolutionTaylorGreen(solver.dt*NT)
-	print la.norm(solver.q - solver.exactSolution)/la.norm(solver.exactSolution)
 
-	solver = NavierStokesSolver(N=24, alphaExplicit=0., alphaImplicit=1., dt=0.1)
-	solver.runSimulation(nt=NT, nsave=5, folder="24grid")
-	solver.exactSolutionTaylorGreen(solver.dt*NT)
-	print la.norm(solver.q - solver.exactSolution)/la.norm(solver.exactSolution)
+	solver = NavierStokesSolver(N=24, alphaExplicit=0., alphaImplicit=1., dt=0.1, folder="NS24")
+	solver.runSimulation(nt=NT)

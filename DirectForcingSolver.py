@@ -29,8 +29,8 @@ def pointOfIntersectionY(yBottom, yTop, x):
 		return y1
 
 class DirectForcingSolver(NavierStokesSolver):
-	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.01, dt=-1.0, order='linear', side='outside'):
-		NavierStokesSolver.__init__(self, N, alphaImplicit, alphaExplicit, gamma, zeta, nu, dt)
+	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.01, dt=-1.0, folder=".", order='linear', side='outside'):
+		NavierStokesSolver.__init__(self, N, alphaImplicit, alphaExplicit, gamma, zeta, nu, dt, folder)
 		self.order = order
 		self.side = side
 
@@ -41,15 +41,30 @@ class DirectForcingSolver(NavierStokesSolver):
 		self.coeffsX = np.zeros(2*N*N)
 		self.tagsY   = -np.ones(2*N*N, dtype=np.int)
 		self.coeffsY = np.zeros(2*N*N)
-		self.xu = -np.zeros(N)
-		self.yu = -np.zeros(N)
-		self.xv = -np.zeros(N)
-		self.yv = -np.zeros(N)
+		self.xu = -np.zeros(N+1)
+		self.yu = -np.zeros(N+1)
+		self.xv = -np.zeros(N+1)
+		self.yv = -np.zeros(N+1)
 		self.initCoords()
 		self.tagPoints()
 
-	def initMatrices(self):
-		NavierStokesSolver.initMatrices(self)
+	def initFluxes(self):
+		h = self.h
+		N = self.N
+		row_index = 0
+		for j in xrange(N):
+			for i in xrange(N):
+				# u
+				x = (i+1)*h
+				y = (j+0.5)*h
+				self.q[row_index] = 1.0*h
+				row_index+=1
+
+				# v
+				x = (i+0.5)*h
+				y = (j+1)*h
+				self.q[row_index] = 0.0*h
+				row_index+=1
 
 	def initCoords(self):
 		N = self.N
@@ -61,19 +76,28 @@ class DirectForcingSolver(NavierStokesSolver):
 			for i in xrange(N):
 				self.xu[i] = (i+1)*h
 				self.xv[i] = (i+0.5)*h
+		self.xu[N] = (N+1)*h
+		self.yu[N] = (N+0.5)*h
+		self.xv[N] = (N+0.5)*h
+		self.yv[N] = (N+1)*h
+		#print self.xu
+		#print self.yu
+		#print self.xv
+		#print self.yv
 
 	def tagPoints(self):
 		if self.side =='outside':
 			self.tagOutsidePoints()
 		if self.side =='inside':
 			self.tagInsidePoints()
+		self.plotTaggedPoints()
 
 	def tagOutsidePoints(self):
 		N = self.N
 		h = self.h
-		for j in xrange(1,N-1):
-			for i in xrange(1,N-1):
-				index = 2*(j*N+i)
+		index = 0
+		for j in xrange(N):
+			for i in xrange(N):
 				# tagsX
 				if outside(self.xu[i], self.yu[j]) and not outside(self.xu[i-1], self.yu[j]):
 					x = pointOfIntersectionX(self.xu[i-1], self.xu[i], self.yu[j])
@@ -95,6 +119,7 @@ class DirectForcingSolver(NavierStokesSolver):
 					self.coeffsY[index] = (self.yu[j]-y)/(self.yu[j-1]-y)
 
 				index+=1
+
 				# tagsX
 				if outside(self.xv[i], self.yv[j]) and not outside(self.xv[i-1], self.yv[j]):
 					x = pointOfIntersectionX(self.xv[i-1], self.xv[i], self.yv[j])
@@ -114,6 +139,8 @@ class DirectForcingSolver(NavierStokesSolver):
 					y = pointOfIntersectionY(self.yv[j], self.yv[j+1], self.xv[i])
 					self.tagsY[index] = index-2*N
 					self.coeffsY[index] = (self.yv[j]-y)/(self.yv[j-1]-y)
+
+				index+=1
 
 		#print np.reshape(self.tagsX[::2], (N,N))
 		#print np.reshape(self.tagsX[1::2], (N,N))
@@ -171,6 +198,50 @@ class DirectForcingSolver(NavierStokesSolver):
 		#print np.reshape(self.tagsX[1::2], (N,N))
 		#print np.reshape(self.tagsY[::2], (N,N))
 		#print np.reshape(self.tagsY[1::2], (N,N))
+
+	def plotTaggedPoints(self):
+		N = self.N
+		fig = plt.figure()
+		ax = fig.add_subplot(111)
+		indices = [i for i,tagX in enumerate(self.tagsX) if tagX>-1]
+		x = np.zeros(len(indices))
+		y = np.zeros(len(indices))
+		for I, index in enumerate(indices):
+			idx = index/2
+			i = idx % N
+			j = idx / N
+			if index % 2 == 0:
+				x[I] = self.xu[i]
+				y[I] = self.yu[j]
+			else:
+				x[I] = self.xv[i]
+				y[I] = self.yv[j]
+		ax.plot(x, y, 'ob')
+
+		indices = [i for i,tagY in enumerate(self.tagsY) if tagY>-1]
+		x = np.zeros(len(indices))
+		y = np.zeros(len(indices))
+		for I, index in enumerate(indices):
+			idx = index/2
+			i = idx % N
+			j = idx / N
+			if index % 2 == 0:
+				x[I] = self.xu[i]
+				y[I] = self.yu[j]
+			else:
+				x[I] = self.xv[i]
+				y[I] = self.yv[j]
+		ax.plot(x, y, 'xr', mew=1.5)
+
+		ax.axis([0, 2*np.pi, 0, 2*np.pi])
+		ax.grid(True)
+		ax.set_xticks(np.linspace(0, 2*np.pi, N+1))
+		ax.set_yticks(np.linspace(0, 2*np.pi, N+1))
+		fig.gca().set_aspect('equal', adjustable='box')
+		circ = plt.Circle((np.pi, np.pi), radius=np.pi/2., color='k', fill=False)
+		ax.add_patch(circ)
+		fig.savefig(self.folder+"/taggedPoints.png")
+		fig.clf()
 
 	def generateA(self):
 		NavierStokesSolver.generateA(self)
@@ -301,15 +372,68 @@ class DirectForcingSolver(NavierStokesSolver):
 		self.QT = self.BNQ.transpose(copy=True)
 		self.BNQ = self.dt*self.BNQ
 
+	'''
+	def zeroFluxesInsideBody(self):
+		N = self.N
+		self.qZeroed[:] = self.q[:]
+		index = 0
+		for j in xrange(N):
+			for i in xrange(N):
+				# u
+				if not outside(self.xu[i], self.yu[j]):
+					self.qZeroed[index] = 0.
+				index+=1
+
+				# v
+				if not outside(self.xv[i], self.yv[j]):
+					self.qZeroed[index] = 0.
+				index+=1
+	'''
+
+	'''
+	def writeData(self, n):
+		h = self.h
+		N = self.N
+
+		self.zeroFluxesInsideBody()
+		U = np.zeros(N*N)
+		U[:] = self.qZeroed[::2]/h
+		U = np.reshape(U, (N,N))
+		x = np.linspace(h, 2*np.pi, N)
+		y = np.linspace(0.5*h, 2*np.pi-0.5*h, N)
+		X, Y = np.meshgrid(x, y)
+
+		CS = plt.contour(X, Y, U, levels=np.linspace(-1., 1., 11))
+		plt.colorbar(CS)
+		plt.axis([0, 2*np.pi, 0, 2*np.pi])
+		plt.gca().set_aspect('equal', adjustable='box')
+		plt.savefig("%s/u%07d.png" % (self.folder,n))
+		plt.clf()
+
+		V = np.zeros(N*N)
+		V[:] = self.qZeroed[1::2]/h
+		V = np.reshape(V, (N,N))
+		x = np.linspace(0.5*h, 2*np.pi-0.5*h, N)
+		y = np.linspace(h, 2*np.pi, N)
+		X, Y = np.meshgrid(x, y)
+
+		CS = plt.contour(X, Y, V, levels=np.linspace(-1., 1., 11))
+		plt.colorbar(CS)
+		plt.axis([0, 2*np.pi, 0, 2*np.pi])
+		plt.gca().set_aspect('equal', adjustable='box')
+		plt.savefig("%s/v%07d.png" % (self.folder, n))
+		plt.clf()
+	'''
+
 if __name__ == "__main__":
-	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, side='inside')
-	solver.runSimulation(nt=20, nsave=1, folder="flow-linear-inside")
+	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, side='inside', folder="flow-linear-inside")
+	solver.runSimulation(nt=20, nsave=1)
 
-	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant', side='inside')
-	solver.runSimulation(nt=20, nsave=1, folder="flow-constant-inside")
+	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant', side='inside', folder="flow-constant-inside")
+	solver.runSimulation(nt=20, nsave=1)
 
-	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi)
-	solver.runSimulation(nt=20, nsave=1, folder="flow-linear-outside")
+	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, folder="flow-linear-outside")
+	solver.runSimulation(nt=20, nsave=1)
 
-	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant')
-	solver.runSimulation(nt=20, nsave=1, folder="flow-constant-outside")
+	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant', folder="flow-constant-outside")
+	solver.runSimulation(nt=20, nsave=1)
