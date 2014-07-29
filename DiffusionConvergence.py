@@ -1,4 +1,4 @@
-from DirectForcingSolver import DirectForcingSolver
+from DiffusionSolver import DiffusionSolver
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
@@ -12,12 +12,12 @@ def plotField(u, size):
 	fig = plt.figure()
 	ax = fig.add_subplot(111, projection='3d')
 	surf = ax.plot_wireframe(X, Y, u)
-	ax.set_zlim3d(0, 2)
+	ax.set_zlim3d(-0.5, 2)
 	plt.savefig("%d.png" % (size))
 
 if __name__ == "__main__":
 	NT = 20
-	START_SIZE = 15
+	START_SIZE = 20
 
 	h = 2*np.pi/START_SIZE
 	x = np.arange(h, 2*np.pi+h, h)
@@ -29,19 +29,19 @@ if __name__ == "__main__":
 	print "-"*80
 	size = START_SIZE
 	print size, 'x', size
-	solver = DirectForcingSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=0.0001, order='constant', folder="DF"+str(size), side='outside')
+	solver = DiffusionSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=0.1, order='constant', folder="grid0", side='outside')
 	solver.runSimulation(nt=NT, nsave=NT)
 	print " "
-	u0 = np.reshape(solver.q[::2]/solver.h, (size, size))
-	#u0 = np.reshape(solver.qZeroed[::2]/solver.h, (size, size))
+	#u0 = np.reshape(solver.q[::2]/solver.h, (size, size))
+	u0 = np.reshape(solver.qZeroed[::2]/solver.h, (size, size))
 	plotField(u0, size)
 
 	size *= 3
 	print size, 'x', size
-	solver = DirectForcingSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=0.0001, order='constant', folder="DF"+str(size), side='outside')
+	solver = DiffusionSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=0.1, order='constant', folder="grid1", side='outside')
 	solver.runSimulation(nt=NT, nsave=NT)
-	u1 = np.reshape(solver.q[::2]/solver.h, (size, size))
-	#u1 = np.reshape(solver.qZeroed[::2]/solver.h, (size, size))
+	#u1 = np.reshape(solver.q[::2]/solver.h, (size, size))
+	u1 = np.reshape(solver.qZeroed[::2]/solver.h, (size, size))
 	e10 = la.norm(u1[1::3,2::3]-u0)
 	print "Difference between 1 and 0:", e10
 	print " "
@@ -49,10 +49,10 @@ if __name__ == "__main__":
 
 	size *= 3
 	print size, 'x', size
-	solver = DirectForcingSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=0.0001, order='constant', folder="DF"+str(size), side='outside')
+	solver = DiffusionSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=0.1, order='constant', folder="grid2", side='outside')
 	solver.runSimulation(nt=NT, nsave=NT)
-	u2 = np.reshape(solver.q[::2]/solver.h, (size, size))
-	#u2 = np.reshape(solver.qZeroed[::2]/solver.h, (size, size))
+	#u2 = np.reshape(solver.q[::2]/solver.h, (size, size))
+	u2 = np.reshape(solver.qZeroed[::2]/solver.h, (size, size))
 	e21 = la.norm(u2[4::9,8::9]-u1[1::3,2::3])
 	print "Difference between 2 and 1:", e21
 	print " "

@@ -6,11 +6,11 @@ import numpy.linalg as la
 import matplotlib.pyplot as plt
 import os
 
-def outside(x, y):
-	return (x-np.pi)**2 + (y-np.pi)**2 >= (np.pi/2.)**2
+def outside(x, y, R=np.pi/2.):
+	return (x-np.pi)**2 + (y-np.pi)**2 >= R**2
 
-def inside(x, y):
-	return (x-np.pi)**2 + (y-np.pi)**2 <= (np.pi/2.)**2
+def inside(x, y, R=np.pi/2.):
+	return (x-np.pi)**2 + (y-np.pi)**2 <= R**2
 
 def pointOfIntersectionX(xLeft, xRight, y):
 	x0 = np.pi + np.sqrt((np.pi/2.)**2 - (y-np.pi)**2)
@@ -37,6 +37,7 @@ class DirectForcingSolver(NavierStokesSolver):
 	def initVecs(self):
 		NavierStokesSolver.initVecs(self)
 		N = self.N
+		self.qZeroed = np.zeros(2*N*N)
 		self.tagsX   = -np.ones(2*N*N, dtype=np.int)
 		self.coeffsX = np.zeros(2*N*N)
 		self.tagsY   = -np.ones(2*N*N, dtype=np.int)
@@ -372,7 +373,6 @@ class DirectForcingSolver(NavierStokesSolver):
 		self.QT = self.BNQ.transpose(copy=True)
 		self.BNQ = self.dt*self.BNQ
 
-	'''
 	def zeroFluxesInsideBody(self):
 		N = self.N
 		self.qZeroed[:] = self.q[:]
@@ -388,9 +388,7 @@ class DirectForcingSolver(NavierStokesSolver):
 				if not outside(self.xv[i], self.yv[j]):
 					self.qZeroed[index] = 0.
 				index+=1
-	'''
 
-	'''
 	def writeData(self, n):
 		h = self.h
 		N = self.N
@@ -403,12 +401,16 @@ class DirectForcingSolver(NavierStokesSolver):
 		y = np.linspace(0.5*h, 2*np.pi-0.5*h, N)
 		X, Y = np.meshgrid(x, y)
 
-		CS = plt.contour(X, Y, U, levels=np.linspace(-1., 1., 11))
-		plt.colorbar(CS)
-		plt.axis([0, 2*np.pi, 0, 2*np.pi])
-		plt.gca().set_aspect('equal', adjustable='box')
-		plt.savefig("%s/u%07d.png" % (self.folder,n))
-		plt.clf()
+		fig = plt.figure()
+		ax = fig.add_subplot(111)
+		CS = ax.contour(X, Y, U, levels=np.linspace(-2., 2., 21))
+		fig.colorbar(CS)
+		ax.axis([0, 2*np.pi, 0, 2*np.pi])
+		fig.gca().set_aspect('equal', adjustable='box')
+		circ = plt.Circle((np.pi, np.pi), radius=np.pi/2., color='k', fill=False)
+		ax.add_patch(circ)
+		fig.savefig("%s/u%07d.png" % (self.folder,n))
+		fig.clf()
 
 		V = np.zeros(N*N)
 		V[:] = self.qZeroed[1::2]/h
@@ -417,13 +419,16 @@ class DirectForcingSolver(NavierStokesSolver):
 		y = np.linspace(h, 2*np.pi, N)
 		X, Y = np.meshgrid(x, y)
 
-		CS = plt.contour(X, Y, V, levels=np.linspace(-1., 1., 11))
-		plt.colorbar(CS)
-		plt.axis([0, 2*np.pi, 0, 2*np.pi])
-		plt.gca().set_aspect('equal', adjustable='box')
-		plt.savefig("%s/v%07d.png" % (self.folder, n))
-		plt.clf()
-	'''
+		fig = plt.figure()
+		ax = fig.add_subplot(111)
+		CS = ax.contour(X, Y, V, levels=np.linspace(-2., 2., 21))
+		fig.colorbar(CS)
+		ax.axis([0, 2*np.pi, 0, 2*np.pi])
+		fig.gca().set_aspect('equal', adjustable='box')
+		circ = plt.Circle((np.pi, np.pi), radius=np.pi/2., color='k', fill=False)
+		ax.add_patch(circ)
+		fig.savefig("%s/v%07d.png" % (self.folder,n))
+		fig.clf()
 
 if __name__ == "__main__":
 	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, side='inside', folder="flow-linear-inside")

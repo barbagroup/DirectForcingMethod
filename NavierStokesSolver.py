@@ -258,6 +258,7 @@ class NavierStokesSolver:
 		h = self.h
 		N = self.N
 
+
 		U = np.zeros(N*N)
 		U[:] = self.q[::2]/h
 		U = np.reshape(U, (N,N))
