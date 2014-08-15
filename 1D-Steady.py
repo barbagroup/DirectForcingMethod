@@ -1,4 +1,3 @@
-from NavierStokesSolver import NavierStokesSolver
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as sla
@@ -8,9 +7,9 @@ import os
 
 nu = 0.125
 dpdx = -1.
-interp = 'constant'
+interp = 'linear'
 
-N = 6
+N = 20
 h = 1./N
 y = np.linspace(-0.5+h/2., 0.5-h/2., N)
 width = 0.8
@@ -42,7 +41,7 @@ for i in xrange(N):
 	if i==left:
 		vals[index] = 0.
 	elif i==right:
-		vals[index] = 0. if interp=='constant' else -xi_right
+		vals[index] = -xi_right if interp=='linear' else 0.
 	else:
 		vals[index] = 1.
 	index+=1
@@ -55,7 +54,7 @@ for i in xrange(N):
 	rows[index] = i
 	cols[index] = i+1 if i<N-1 else 0
 	if i==left:
-		vals[index] = 0. if interp=='constant' else -xi_left
+		vals[index] = -xi_left if interp=='linear' else 0.
 	elif i==right:
 		vals[index] = 0.
 	else:
