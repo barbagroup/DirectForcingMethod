@@ -4,7 +4,7 @@ import numpy.linalg as la
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d
 
-def plotField(u, size):
+def plotField(u, size, name):
 	h = 2*np.pi/size
 	x = np.arange(h, 2*np.pi+h, h)
 	y = np.arange(h/2., 2*np.pi, h)
@@ -13,7 +13,7 @@ def plotField(u, size):
 	ax = fig.add_subplot(111, projection='3d')
 	surf = ax.plot_wireframe(X, Y, u)
 	ax.set_zlim3d(0, 2)
-	plt.savefig("%d.png" % (size))
+	plt.savefig("%d.png" % (name))
 
 if __name__ == "__main__":
 	NT = 20
@@ -31,31 +31,57 @@ if __name__ == "__main__":
 	print size, 'x', size
 	solver = DirectForcingSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.05, dt=0.0001, order='linear', folder="DF"+str(size), side='outside')
 	solver.runSimulation(nt=NT, nsave=NT)
+	umask, vmask = solver.createMask()
 	print " "
 	u0 = np.reshape(solver.q[::2]/solver.h, (size, size))
-	#u0 = np.reshape(solver.qZeroed[::2]/solver.h, (size, size))
-	plotField(u0, size)
+	v0 = np.reshape(solver.q[1::2]/solver.h, (size, size))
+	#plotField(u0, size)
+	plotField(u0*umask, size, size)
 
 	size *= 3
 	print size, 'x', size
 	solver = DirectForcingSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.05, dt=0.0001, order='linear', folder="DF"+str(size), side='outside')
 	solver.runSimulation(nt=NT, nsave=NT)
 	u1 = np.reshape(solver.q[::2]/solver.h, (size, size))
-	#u1 = np.reshape(solver.qZeroed[::2]/solver.h, (size, size))
-	e10 = la.norm(u1[1::3,2::3]-u0)
-	print "Difference between 1 and 0:", e10
+	v1 = np.reshape(solver.q[1::2]/solver.h, (size, size))
+	e10u = la.norm((u1[1::3,2::3]-u0)*umask)
+	e10v = la.norm((v1[2::3,1::3]-v0)*vmask)
+	print "Difference between 1 and 0 (u):", e10u
+	print "Difference between 1 and 0 (v):", e10v
 	print " "
-	plotField(u1, size)
+	#plotField(u1, size)
+	plotField(u1[1::3,2::3]*umask, size/3, size)
 
 	size *= 3
 	print size, 'x', size
 	solver = DirectForcingSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.05, dt=0.0001, order='linear', folder="DF"+str(size), side='outside')
 	solver.runSimulation(nt=NT, nsave=NT)
 	u2 = np.reshape(solver.q[::2]/solver.h, (size, size))
-	#u2 = np.reshape(solver.qZeroed[::2]/solver.h, (size, size))
-	e21 = la.norm(u2[4::9,8::9]-u1[1::3,2::3])
-	print "Difference between 2 and 1:", e21
+	v2 = np.reshape(solver.q[1::2]/solver.h, (size, size))
+	e21u = la.norm((u2[4::9,8::9]-u1[1::3,2::3])*umask)
+	e21v = la.norm((v2[8::9,4::9]-v1[2::3,1::3])*vmask)
+	print "Difference between 2 and 1 (u):", e21u
+	print "Difference between 2 and 1 (v):", e21v
 	print " "
-	plotField(u2, size)
+	#plotField(u2, size)
+	plotField(u2[4::9,8::9]*umask, size/9, size)
 
-	print "Experimental order of convergence:", (np.log(e21)-np.log(e10))/np.log(3)
+	print "Experimental order of convergence (u):", (np.log(e21u)-np.log(e10u))/np.log(3)
+	print "Experimental order of convergence (v):", (np.log(e21v)-np.log(e10v))/np.log(3)
+
+	size *= 3
+	print size, 'x', size
+	solver = DirectForcingSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.05, dt=0.0001, order='linear', folder="DF"+str(size), side='outside')
+	solver.runSimulation(nt=NT, nsave=NT)
+	u3 = np.reshape(solver.q[::2]/solver.h, (size, size))
+	v3 = np.reshape(solver.q[1::2]/solver.h, (size, size))
+	e32u = la.norm((u3[13::27,26::27]-u2[4::9,8::9])*umask)
+	e32v = la.norm((v3[26::27,13::27]-v2[8::9,4::9])*vmask)
+	print "Difference between 2 and 1 (u):", e32u
+	print "Difference between 2 and 1 (v):", e32v
+	print " "
+	#plotField(u2, size)
+	plotField(u3[13::27,26::27]*umask, size/27, size)
+
+	print "Experimental order of convergence (u):", (np.log(e32u)-np.log(e21u))/np.log(3)
+	print "Experimental order of convergence (v):", (np.log(e32v)-np.log(e21v))/np.log(3)

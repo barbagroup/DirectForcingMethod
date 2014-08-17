@@ -375,27 +375,49 @@ class DirectForcingSolver(NavierStokesSolver):
 
 	def zeroFluxesInsideBody(self):
 		N = self.N
+		halo = 1.0
 		self.qZeroed[:] = self.q[:]
 		index = 0
 		for j in xrange(N):
 			for i in xrange(N):
 				# u
-				if not outside(self.xu[i], self.yu[j]):
+				if not outside(self.xu[i], self.yu[j], np.pi/2.*halo):
 					self.qZeroed[index] = 0.
 				index+=1
 
 				# v
-				if not outside(self.xv[i], self.yv[j]):
+				if not outside(self.xv[i], self.yv[j], np.pi/2.*halo):
 					self.qZeroed[index] = 0.
 				index+=1
+
+	def createMask(self):
+		N = self.N
+		halo = 1.0
+		umask = np.ones(N*N)
+		vmask = np.ones(N*N)
+		index = 0
+		for j in xrange(N):
+			for i in xrange(N):
+				# u
+				if not outside(self.xu[i], self.yu[j], np.pi/2.*halo):
+					umask[index] = 0.
+
+				# v
+				if not outside(self.xv[i], self.yv[j], np.pi/2.*halo):
+					vmask[index] = 0.
+				
+				index+=1
+		return np.reshape(umask, (N, N)), np.reshape(vmask, (N, N))
 
 	def writeData(self, n):
 		h = self.h
 		N = self.N
 
+		# u-velocity
 		self.zeroFluxesInsideBody()
 		U = np.zeros(N*N)
 		U[:] = self.qZeroed[::2]/h
+		#U[:] = self.q[::2]/h
 		U = np.reshape(U, (N,N))
 		x = np.linspace(h, 2*np.pi, N)
 		y = np.linspace(0.5*h, 2*np.pi-0.5*h, N)
@@ -412,8 +434,10 @@ class DirectForcingSolver(NavierStokesSolver):
 		fig.savefig("%s/u%07d.png" % (self.folder,n))
 		fig.clf()
 
+		# v-velocity
 		V = np.zeros(N*N)
 		V[:] = self.qZeroed[1::2]/h
+		#V[:] = self.q[1::2]/h
 		V = np.reshape(V, (N,N))
 		x = np.linspace(0.5*h, 2*np.pi-0.5*h, N)
 		y = np.linspace(h, 2*np.pi, N)
@@ -429,6 +453,8 @@ class DirectForcingSolver(NavierStokesSolver):
 		ax.add_patch(circ)
 		fig.savefig("%s/v%07d.png" % (self.folder,n))
 		fig.clf()
+
+		# pressure
 
 if __name__ == "__main__":
 	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, side='inside', folder="flow-linear-inside")
