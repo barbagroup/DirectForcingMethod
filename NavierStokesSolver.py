@@ -4,6 +4,7 @@ import scipy.sparse.linalg as sla
 import numpy.linalg as la
 import matplotlib.pyplot as plt
 import os
+import pyamg
 
 class NavierStokesSolver:
 	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.1, dt=-1.0, folder="."):
@@ -117,6 +118,7 @@ class NavierStokesSolver:
 		self.QTBNQ = self.QT*self.BNQ
 		idx = list(self.QTBNQ.indices).index(0)
 		self.QTBNQ.data[idx] *=2.0
+		self.ml = pyamg.ruge_stuben_solver(self.QTBNQ)
 
 	def generateA(self):
 		h = self.h
@@ -249,7 +251,8 @@ class NavierStokesSolver:
 
 		# solve for pressure
 		self.rhs2 = self.QT*self.qStar
-		self.phi, _ = sla.cg(self.QTBNQ, self.rhs2)
+		#self.phi, _ = sla.cg(self.QTBNQ, self.rhs2)
+		self.phi = self.ml.solve(self.rhs2, tol=1e-5)
 
 		# projection step
 		self.q = self.qStar - self.BNQ*self.phi
