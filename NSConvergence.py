@@ -27,8 +27,8 @@ print "Theoretical order of convergence:", (np.log(la.norm(u1-uExact))-np.log(la
 print " "
 
 size *= 3
-solver = NavierStokesSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=0.001)
-solver.runSimulation(nt=NT, plot=False)
+solver = NavierStokesSolver(N=size, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=0.001, folder="NS-grid2")
+solver.runSimulation(nt=NT, plot=True, nsave=NT)
 u2 = np.reshape(solver.q[::2]/solver.h, (size, size))[4::9,8::9]
 print "Difference between 2 and exact:", la.norm(u2-uExact)
 print "Difference between 2 and 1    :", la.norm(u2-u1)

@@ -5,6 +5,7 @@ import numpy.linalg as la
 import matplotlib.pyplot as plt
 import os
 import pyamg
+import errno
 
 class NavierStokesSolver:
 	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.1, dt=-1.0, folder="."):
@@ -247,12 +248,12 @@ class NavierStokesSolver:
 	def stepTime(self):
 		# solve for intermediate velocity
 		self.calculateRN()
-		self.qStar, _ = sla.cg(self.A, self.rn)
+		self.qStar, _ = sla.bicgstab(self.A, self.rn, tol=1e-8)
 
 		# solve for pressure
 		self.rhs2 = self.QT*self.qStar
 		#self.phi, _ = sla.cg(self.QTBNQ, self.rhs2)
-		self.phi = self.ml.solve(self.rhs2, tol=1e-5)
+		self.phi = self.ml.solve(self.rhs2, tol=1e-8)
 
 		# projection step
 		self.q = self.qStar - self.BNQ*self.phi
@@ -292,9 +293,12 @@ class NavierStokesSolver:
 
 	def runSimulation(self, nt=20, nsave=1, plot=True):
 		try:
-			os.mkdir(self.folder)
-		except:
-			pass
+			os.makedirs(self.folder)
+		except OSError as exc:
+			if exc.errno == errno.EEXIST and os.path.isdir(self.folder):
+				pass
+			else:
+				raise
 		self.initVecs()
 		self.initMatrices()
 		if plot:

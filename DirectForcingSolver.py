@@ -29,10 +29,11 @@ def pointOfIntersectionY(yBottom, yTop, x):
 		return y1
 
 class DirectForcingSolver(NavierStokesSolver):
-	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.01, dt=-1.0, folder=".", order='linear', side='outside'):
+	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.01, dt=-1.0, folder=".", order='linear', side='outside', coarsest=15):
 		NavierStokesSolver.__init__(self, N, alphaImplicit, alphaExplicit, gamma, zeta, nu, dt, folder)
 		self.order = order
 		self.side = side
+		self.coarsest = coarsest
 
 	def initVecs(self):
 		NavierStokesSolver.initVecs(self)
@@ -422,12 +423,14 @@ class DirectForcingSolver(NavierStokesSolver):
 		x = np.linspace(h, 2*np.pi, N)
 		y = np.linspace(0.5*h, 2*np.pi-0.5*h, N)
 		X, Y = np.meshgrid(x, y)
-
 		fig = plt.figure()
 		ax = fig.add_subplot(111)
 		CS = ax.contour(X, Y, U, levels=np.linspace(-2., 2., 21))
 		fig.colorbar(CS)
 		ax.axis([0, 2*np.pi, 0, 2*np.pi])
+		#ax.grid(True)
+		#ax.set_xticks(np.linspace(0, 2*np.pi, self.coarsest+1))
+		#ax.set_yticks(np.linspace(0, 2*np.pi, self.coarsest+1))
 		fig.gca().set_aspect('equal', adjustable='box')
 		circ = plt.Circle((np.pi, np.pi), radius=np.pi/2., color='k', fill=False)
 		ax.add_patch(circ)
@@ -442,12 +445,14 @@ class DirectForcingSolver(NavierStokesSolver):
 		x = np.linspace(0.5*h, 2*np.pi-0.5*h, N)
 		y = np.linspace(h, 2*np.pi, N)
 		X, Y = np.meshgrid(x, y)
-
 		fig = plt.figure()
 		ax = fig.add_subplot(111)
 		CS = ax.contour(X, Y, V, levels=np.linspace(-2., 2., 21))
 		fig.colorbar(CS)
 		ax.axis([0, 2*np.pi, 0, 2*np.pi])
+		#ax.grid(True)
+		#ax.set_xticks(np.linspace(0, 2*np.pi, self.coarsest+1))
+		#ax.set_yticks(np.linspace(0, 2*np.pi, self.coarsest+1))
 		fig.gca().set_aspect('equal', adjustable='box')
 		circ = plt.Circle((np.pi, np.pi), radius=np.pi/2., color='k', fill=False)
 		ax.add_patch(circ)
