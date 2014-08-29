@@ -34,6 +34,8 @@ if __name__ == "__main__":
 	ORDER = 'linear'
 	FOLDER = str(START_SIZE)+'-'+ORDER
 
+	print "\nInterpolation type: %s\n" % (ORDER)
+
 	h = 2*np.pi/START_SIZE
 	x = np.arange(h, 2*np.pi+h, h)
 	y = np.arange(h/2., 2*np.pi, h)
