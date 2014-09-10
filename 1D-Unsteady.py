@@ -3,9 +3,10 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as sla
 import numpy.linalg as la
 import matplotlib.pyplot as plt
-import os, errno
+import os
+import errno
 
-def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=400, dt=0.0125, folder="new"):
+def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=400, dt=0.001, folder="new"):
 	try:
 		os.makedirs(folder)
 	except OSError as exc:
@@ -13,16 +14,17 @@ def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=400, dt=0
 			pass
 		else:
 			raise
+	eps = 1.e-7
 	h = 1./N
 	y = np.linspace(-0.5+h/2., 0.5-h/2., N)
 	mask = np.ones(N)
 	width = 0.8
 	left = 0
-	while y[left] < -width/2.:
+	while y[left]+eps < -width/2.:
 		left+=1
 	xi_left = (y[left]+width/2.)/(y[left]+width/2.+h)
 	right = N-1
-	while y[right] > width/2.:
+	while y[right]-eps > width/2.:
 		right-=1
 	xi_right = (width/2.-y[right])/(width/2.-y[right]+h)
 
@@ -77,62 +79,55 @@ def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=400, dt=0
 
 		u, _ = sla.bicgstab(A, b, tol=1e-8)
 
-		'''
-		if n%10==0:
-			plt.ioff()
-			plt.plot(y, u, label='Numerical')
-			plt.plot(y, uExact, label='Exact')
-			plt.legend()
-			plt.axis([-0.5,0.5,0,-dpdx/nu/8*width*width*2])
-			plt.savefig('output%03d.png' % n)
-			plt.clf()
-		'''
-
-	plt.ioff()
-	plt.plot(y, u, label='Numerical')
-	plt.plot(y, uExact, label='Exact')
-	plt.legend()
-	plt.axis([-0.5,0.5,0,1.2])
-	plt.savefig('%s/output%03d.png' % (folder, N))
-	plt.clf()
-
-	return y, u, mask
-
-if __name__ == "__main__":
-	START_SIZE = 10
-	INTERP = 'linear'
-	FOLDER = '1D-Unsteady/' + str(START_SIZE) + '-' + INTERP
-
-	print "Interpolation type:", INTERP
-	print "Initial mesh size: ", str(START_SIZE)
-	
-	SIZE = START_SIZE
-	y0, u0, umask = unsteady_channel_flow(N=SIZE, interp=INTERP, nt=2000, dt=0.0001, folder=FOLDER)
-
-	SIZE = SIZE*3
-	y1, u1, _ = unsteady_channel_flow(N=SIZE, interp=INTERP, nt=2000, dt=0.0001, folder=FOLDER)
-	e1 = la.norm(u1[1::3]-u0)
-
-	SIZE = SIZE*3
-	y2, u2, _ = unsteady_channel_flow(N=SIZE, interp=INTERP, nt=2000, dt=0.0001, folder=FOLDER)
-	e2 = la.norm(u2[4::9]-u1[1::3])
-
-	order_of_convergence = np.log(e2/e1)/np.log(3)
-	print "Order of convergence: %f" % order_of_convergence
-
-	SIZE = SIZE*3
-	y3, u3, _ = unsteady_channel_flow(N=SIZE, interp=INTERP, nt=2000, dt=0.0001, folder=FOLDER)
-	e3 = la.norm(u3[13::27]-u2[4::9])
-
-	order_of_convergence = np.log(e3/e2)/np.log(3)
-	print "Order of convergence: %f" % order_of_convergence
-	
 	plt.ioff()
 	plt.clf()
-	plt.plot(y0, u0*umask, 'o-', label="%d" % (len(u0)))
-	plt.plot(y1[1::3], u1[1::3]*umask, 'o-', label="%d" % (len(u1)))
-	plt.plot(y2[4::9], u2[4::9]*umask, 'o-', label="%d" % (len(u2)))
-	plt.plot(y3[13::27], u3[13::27]*umask, 'o-', label="%d" % (len(u3)))
-	plt.axis([-0.5,0.5,0,1.2])
+	plt.plot(y, u, 'r', label='Numerical', color='blue')
+	plt.plot(y[left:right+1], u[left:right+1], label='Numerical', color='green')
+	plt.plot(y[left:right+1], uExact[left:right+1], label='Exact', color='red')
 	plt.legend()
-	plt.savefig("%s/solutions.png" % (FOLDER))
+	plt.axis([-0.5,0.5,0,-dpdx/nu/8*width*width*1.5])
+	plt.savefig('%s/mesh-%d.png' % (folder, N))
+
+	return u*mask, la.norm((u-uExact)*mask)/la.norm(uExact*mask), y[left], y[right]
+
+def three_grid_convergence(start_size, interp_type, folder):
+	PATH = '1D-Unsteady/%s/%s/three_grid' % (interp_type, folder)
+	print "%d: " % start_size,
+	NUM_GRIDS = 4
+	u = [[]]*NUM_GRIDS
+	diffs = np.zeros(NUM_GRIDS-1)
+	y_left  = np.zeros(NUM_GRIDS)
+	y_right = np.zeros(NUM_GRIDS)
+	for i in range(NUM_GRIDS):
+		size = start_size*(3**i)
+		u[i], _, y_left[i], y_right[i] = unsteady_channel_flow(N=size, interp=interp_type, folder=PATH)
+
+	diffs[0] = la.norm(u[1][1::3]-u[0])
+	diffs[1] = la.norm(u[2][4::9]-u[1][1::3])
+	diffs[2] = la.norm(u[3][13::27]-u[2][4::9])
+
+	print "%1.4f, %1.4f" % (np.log(diffs[0]/diffs[1])/np.log(3), np.log(diffs[1]/diffs[2])/np.log(3))
+	print y_left
+	print y_right
+	print diffs
+
+	h = 1./start_size
+	y = np.linspace(-0.5+h/2., 0.5-h/2., start_size)
+	plt.ioff()
+	plt.clf()
+	plt.plot(y, u[0], label="grid0")
+	plt.plot(y, u[1][1::3], label="grid1")
+	plt.plot(y, u[2][4::9], label="grid2")
+	plt.plot(y, u[3][13::27], label="grid3")
+	plt.axis([-0.5,0.5,0,1.5*0.64])
+	plt.legend()
+	plt.savefig('%s/three-grid.png' % (PATH))
+
+if __name__=="__main__":
+	START = 10
+	END = 21
+	INTERP = "linear"
+	for size in range(START,END):
+		FOLDER = str(size) + '-' + INTERP
+		three_grid_convergence(size, INTERP, FOLDER)
+		print " "

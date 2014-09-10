@@ -162,7 +162,7 @@ def three_grid_convergence(start_size, interp_type, folder):
 
 if __name__=="__main__":
 	START = 10
-	END = 11
+	END = 21
 	INTERP = "linear"
 	for size in range(START,END):
 		FOLDER = str(size) + '-' + INTERP

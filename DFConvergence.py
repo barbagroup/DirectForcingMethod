@@ -10,6 +10,7 @@ def plotField(u, size, name, folder):
 	x = np.arange(h, 2*np.pi+h, h)
 	y = np.arange(h/2., 2*np.pi, h)
 	X, Y = np.meshgrid(x,y)
+	plt.ioff()
 	fig = plt.figure()
 	ax = fig.add_subplot(111, projection='3d')
 	surf = ax.plot_wireframe(X, Y, u)
@@ -21,6 +22,7 @@ def plotDiff(u2, u1, size, name, folder):
 	x = np.arange(h, 2*np.pi+h, h)
 	y = np.arange(h/2., 2*np.pi, h)
 	X, Y = np.meshgrid(x,y)
+	plt.ioff()
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 	CS = ax.pcolor(X, Y, abs(u2-u1), norm=LogNorm(vmin=1e-10, vmax=1))
@@ -30,7 +32,7 @@ def plotDiff(u2, u1, size, name, folder):
 
 if __name__ == "__main__":
 	NT = 20
-	START_SIZE = 15
+	START_SIZE = 20
 	ORDER = 'linear'
 	FOLDER = str(START_SIZE)+'-'+ORDER
 

@@ -270,6 +270,7 @@ class NavierStokesSolver:
 		y = np.linspace(0.5*h, 2*np.pi-0.5*h, N)
 		X, Y = np.meshgrid(x, y)
 
+		plt.ioff()
 		CS = plt.contour(X, Y, U, levels=np.linspace(-1., 1., 11))
 		plt.colorbar(CS)
 		plt.axis([0, 2*np.pi, 0, 2*np.pi])
