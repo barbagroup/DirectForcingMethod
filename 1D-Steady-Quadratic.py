@@ -22,14 +22,20 @@ def steady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', folder="new"):
 	y = np.linspace(-0.5+h/2., 0.5-h/2., N)
 	mask = np.ones(N)
 	width = 0.8
+
 	left = 0
 	while y[left]+eps < -width/2.:
 		left+=1
-	xi_left = (y[left]+width/2.)/(y[left]+width/2.+h)
+	a = y[left]+width/2.
+	C2_left = 2*a/(a+h)
+	C3_left = -a/(a+2*h)
+
 	right = N-1
 	while y[right]-eps > width/2.:
 		right-=1
-	xi_right = (width/2.-y[right])/(width/2.-y[right]+h)
+	a = width/2.-y[right]
+	C2_right = 2*a/(a+h)
+	C3_right = -a/(a+2*h)
 
 	for i in xrange(len(mask)):
 		if i<left or i>right:
@@ -40,21 +46,33 @@ def steady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', folder="new"):
 	uExact[:] = dpdx/nu/8.*(4*y[:]*y[:]-width**2)
 
 	# matrix
-	rows = np.zeros(3*N, dtype=np.int)
-	cols = np.zeros(3*N, dtype=np.int)
-	vals = np.zeros(3*N, dtype=np.float)
+	rows = np.zeros(5*N, dtype=np.int)
+	cols = np.zeros(5*N, dtype=np.int)
+	vals = np.zeros(5*N, dtype=np.float)
 	# rhs
 	b = np.zeros(N)
 
 	index = 0
 
 	for i in xrange(N):
+		# coefficent of u_{i-2}
 		rows[index] = i
-		cols[index] = i-1 if i>0 else N-1
+		cols[index] = i-2 if i>1 else N+i-2
 		if i==left:
 			vals[index] = 0.
 		elif i==right:
-			vals[index] = -xi_right if interp=='linear' else 0.
+			vals[index] = -C3_right if interp=='quadratic' else 0.
+		else:
+			vals[index] = 0.
+		index+=1
+
+		# coefficient of u_{i-1}
+		rows[index] = i
+		cols[index] = i-1 if i>0 else N+i-1
+		if i==left:
+			vals[index] = 0.
+		elif i==right:
+			vals[index] = -C2_right if interp=='quadratic' else 0.
 		else:
 			vals[index] = 1.
 		index+=1
@@ -65,18 +83,30 @@ def steady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', folder="new"):
 		index+=1
 
 		rows[index] = i
-		cols[index] = i+1 if i<N-1 else 0
+		cols[index] = i+1 if i<N-1 else i+1-N
 		if i==left:
-			vals[index] = -xi_left if interp=='linear' else 0.
+			vals[index] = -C2_left if interp=='quadratic' else 0.
 		elif i==right:
 			vals[index] = 0.
 		else:
 			vals[index] = 1.
 		index+=1
 
+		rows[index] = i
+		cols[index] = i+2 if i<N-2 else i+2-N
+		if i==left:
+			vals[index] = -C3_left if interp=='quadratic' else 0.
+		elif i==right:
+			vals[index] = 0.
+		else:
+			vals[index] = 0.
+		index+=1
+
 		b[i] = 0. if (i==left or i==right) else dpdx/nu*h**2
 
 	A = sp.csr_matrix((vals, (rows, cols)), shape=(N, N))
+	#if N==10:
+	#	print A
 
 	#e, _ = la.eig(A.todense())
 	#print e
@@ -96,7 +126,7 @@ def steady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', folder="new"):
 	return u*mask, la.norm((u-uExact)*mask)/la.norm(uExact*mask), y[left], y[right]
 
 def two_grid_convergence(start_size, interp_type, folder):
-	PATH = '1D-Steady/%s/%s/two_grid' % (interp_type, folder)
+	PATH = '1D-Steady-Quadratic/%s/%s/two_grid' % (interp_type, folder)
 	print "%d: " % start_size,
 	NUM_GRIDS = 3
 	errors = np.zeros(NUM_GRIDS)
@@ -130,7 +160,7 @@ def two_grid_convergence(start_size, interp_type, folder):
 	'''
 
 def three_grid_convergence(start_size, interp_type, folder):
-	PATH = '1D-Steady/%s/%s/three_grid' % (interp_type, folder)
+	PATH = '1D-Steady-Quadratic/%s/%s/three_grid' % (interp_type, folder)
 	print "%d: " % start_size,
 	NUM_GRIDS = 4
 	u = [[]]*NUM_GRIDS
@@ -165,7 +195,7 @@ def three_grid_convergence(start_size, interp_type, folder):
 if __name__=="__main__":
 	START = 10
 	END = 21
-	INTERP = "linear"
+	INTERP = "quadratic"
 	for size in range(START,END):
 		FOLDER = str(size) + '-' + INTERP
 		two_grid_convergence(size, INTERP, FOLDER)

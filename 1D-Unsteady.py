@@ -3,6 +3,8 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as sla
 import numpy.linalg as la
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import errno
@@ -15,15 +17,17 @@ def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=400, dt=0
 			pass
 		else:
 			raise
-	eps = 1.e-7
+	eps = 1.e-8
 	h = 1./N
 	y = np.linspace(-0.5+h/2., 0.5-h/2., N)
 	mask = np.ones(N)
 	width = 0.8
+	
 	left = 0
 	while y[left]+eps < -width/2.:
 		left+=1
 	xi_left = (y[left]+width/2.)/(y[left]+width/2.+h)
+	
 	right = N-1
 	while y[right]-eps > width/2.:
 		right-=1
