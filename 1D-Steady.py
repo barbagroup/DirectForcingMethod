@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as sla
@@ -14,7 +15,7 @@ def steady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', folder="new"):
 			pass
 		else:
 			raise
-	eps = 1.e-7
+	eps = 1.e-8
 	h = 1./N
 	y = np.linspace(-0.5+h/2., 0.5-h/2., N)
 	mask = np.ones(N)
@@ -143,7 +144,6 @@ def three_grid_convergence(start_size, interp_type, folder):
 	diffs[2] = la.norm(u[3][13::27]-u[2][4::9])
 
 	print "%1.4f, %1.4f" % (np.log(diffs[0]/diffs[1])/np.log(3), np.log(diffs[1]/diffs[2])/np.log(3))
-	print y_left
 	print y_right
 	print diffs
 

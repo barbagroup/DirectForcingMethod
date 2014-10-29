@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as sla
@@ -107,7 +108,6 @@ def three_grid_convergence(start_size, interp_type, folder):
 	diffs[2] = la.norm(u[3][13::27]-u[2][4::9])
 
 	print "%1.4f, %1.4f" % (np.log(diffs[0]/diffs[1])/np.log(3), np.log(diffs[1]/diffs[2])/np.log(3))
-	print y_left
 	print y_right
 	print diffs
 

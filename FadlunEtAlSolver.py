@@ -6,16 +6,11 @@ import numpy.linalg as la
 import matplotlib.pyplot as plt
 import os
 
-epsilon = 1.e-8
-
-def displacement(x1, y1, x2, y2):
-	return np.sqrt((x1-x2)**2 + (y1-y2)**2)
-
 def outside(x, y, R=np.pi/2.):
-	return displacement(x, y, np.pi, np.pi) + epsilon > R
+	return (x-np.pi)**2 + (y-np.pi)**2 >= R**2
 
 def inside(x, y, R=np.pi/2.):
-	return displacement(x, y, np.pi, np.pi) - epsilon < R
+	return (x-np.pi)**2 + (y-np.pi)**2 <= R**2
 
 def pointOfIntersectionX(xLeft, xRight, y):
 	x0 = np.pi + np.sqrt((np.pi/2.)**2 - (y-np.pi)**2)
@@ -33,7 +28,7 @@ def pointOfIntersectionY(yBottom, yTop, x):
 	else:
 		return y1
 
-class DirectForcingSolver(NavierStokesSolver):
+class FadlunEtAlSolver(NavierStokesSolver):
 	def __init__(self, N=4, alphaImplicit=1., alphaExplicit=0., gamma=1., zeta=0., nu=0.01, dt=-1.0, folder=".", order='linear', side='outside', coarsest=15):
 		NavierStokesSolver.__init__(self, N, alphaImplicit, alphaExplicit, gamma, zeta, nu, dt, folder)
 		self.order = order
@@ -54,6 +49,7 @@ class DirectForcingSolver(NavierStokesSolver):
 		self.yv = -np.zeros(N+1)
 		self.initCoords()
 		self.tagPoints()
+		self.net_flux = np.zeros(0)
 
 	def initFluxes(self):
 		h = self.h
@@ -208,6 +204,7 @@ class DirectForcingSolver(NavierStokesSolver):
 
 	def plotTaggedPoints(self):
 		N = self.N
+		plt.ioff()
 		fig = plt.figure()
 		ax = fig.add_subplot(111)
 		indices = [i for i,tagX in enumerate(self.tagsX) if tagX>-1]
@@ -328,57 +325,6 @@ class DirectForcingSolver(NavierStokesSolver):
 					self.rn[index] = 0.
 				index+=1
 
-	def generateBNQ(self):
-		N = self.N
-		rows = np.zeros(4*N*N, dtype=np.int)
-		cols = np.zeros(4*N*N, dtype=np.int)
-		vals = np.zeros(4*N*N, dtype=np.float)
-		index = 0
-		row_index = 0
-		for j in xrange(N):
-			for i in xrange(N):
-				# u
-				rows[index] = row_index
-				cols[index] = j*N+i
-				if self.tagsX[row_index]==-1 and self.tagsY[row_index]==-1:
-					vals[index] = -1.
-				else:
-					vals[index] = 0.
-				index+=1
-
-				rows[index] = row_index
-				cols[index] = j*N+i+1 if i<N-1 else j*N
-				if self.tagsX[row_index]==-1 and self.tagsY[row_index]==-1:
-					vals[index] = 1.
-				else:
-					vals[index] = 0.
-				index+=1
-
-				row_index+=1
-
-				# v
-				rows[index] = row_index
-				cols[index] = j*N+i
-				if self.tagsX[row_index]==-1 and self.tagsY[row_index]==-1:
-					vals[index] = -1.
-				else:
-					vals[index] = 0.
-				index+=1
-
-				rows[index] = row_index
-				cols[index] = (j+1)*N+i if j<N-1 else i
-				if self.tagsX[row_index]==-1 and self.tagsY[row_index]==-1:
-					vals[index] = 1.
-				else:
-					vals[index] = 0.
-				index+=1
-
-				row_index+=1
-
-		self.BNQ = sp.csr_matrix((vals, (rows, cols)), shape=(2*N*N, N*N))
-		self.QT = self.BNQ.transpose(copy=True)
-		self.BNQ = self.dt*self.BNQ
-
 	def zeroFluxesInsideBody(self):
 		N = self.N
 		halo = 1.0
@@ -466,15 +412,32 @@ class DirectForcingSolver(NavierStokesSolver):
 
 		# pressure
 
+	def stepTime(self):
+		NavierStokesSolver.stepTime(self)
+		
+		# mass conservation
+		sum_fluxes = np.sum(self.QT * self.q)
+		self.net_flux = np.append(self.net_flux, sum_fluxes)
+
+	def runSimulation(self, nt=20, nsave=1, plot=True):
+		NavierStokesSolver.runSimulation(self, nt=20, nsave=1, plot=True)
+
+		if plot:
+			plt.ioff()
+			plt.clf()
+			plt.plot(np.arange(1,nt+1), self.net_flux)
+			#plt.axis([0., nt, -1., 1.])
+			plt.savefig("%s/net_flux.png" % (self.folder))
+
 if __name__ == "__main__":
-	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, side='inside', folder="flow-linear-inside")
+	solver = FadlunEtAlSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, side='inside', folder="FadlunEtAl/flow-linear-inside")
 	solver.runSimulation(nt=20, nsave=1)
 
-	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant', side='inside', folder="flow-constant-inside")
+	solver = FadlunEtAlSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant', side='inside', folder="FadlunEtAl/flow-constant-inside")
 	solver.runSimulation(nt=20, nsave=1)
 
-	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, folder="flow-linear-outside")
+	solver = FadlunEtAlSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, folder="FadlunEtAl/flow-linear-outside")
 	solver.runSimulation(nt=20, nsave=1)
 
-	solver = DirectForcingSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant', folder="flow-constant-outside")
+	solver = FadlunEtAlSolver(N=80, alphaExplicit=0., alphaImplicit=1., nu=0.1, dt=1./np.pi, order='constant', folder="FadlunEtAl/flow-constant-outside")
 	solver.runSimulation(nt=20, nsave=1)
