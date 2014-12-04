@@ -78,8 +78,8 @@ def steady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', folder="new"):
 
 	A = sp.csr_matrix((vals, (rows, cols)), shape=(N, N))
 
-	#e, _ = la.eig(A.todense())
-	#print e
+	#if N==10:
+	#	print A
 
 	u, _ = sla.bicgstab(A, b, tol=1e-8)
 
@@ -93,81 +93,76 @@ def steady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', folder="new"):
 	plt.savefig('%s/mesh-%d.png' % (folder, N))
 	plt.clf()
 
-	return u*mask, la.norm((u-uExact)*mask)/la.norm(uExact*mask), y[left], y[right]
+	return u*mask, (u-uExact)*mask, y[left], y[right]
 
-def two_grid_convergence(start_size, interp_type, folder):
+def two_grid_convergence(start_size, interp_type, num_grids, folder):
 	PATH = '1D-Steady/%s/%s/two_grid' % (interp_type, folder)
-	print "%d: " % start_size,
-	NUM_GRIDS = 3
-	errors = np.zeros(NUM_GRIDS)
-	for i in range(NUM_GRIDS):
+	errors = [[]]*num_grids
+	error_norms = np.zeros(num_grids)
+	sizes = np.zeros(num_grids, dtype=int)
+	observed_rates = np.zeros(num_grids-1)
+	theoretical_rates = np.zeros(num_grids-1)
+	y_right = np.zeros(num_grids)
+	start = 0
+	stride = 1
+	for i in range(num_grids):
 		size = start_size*(3**i)
-		_, errors[i], _, _ = steady_channel_flow(N=size, interp=interp_type, folder=PATH)
-	
-	print "%1.4f, %1.4f" % (np.log(errors[0]/errors[1])/np.log(3), np.log(errors[1]/errors[2])/np.log(3))
-	print errors
+		_, errors[i], _, y_right[i] = steady_channel_flow(N=size, interp=interp_type, folder=PATH)
+		error_norms[i] = la.norm(errors[i][start::stride])
+		start  += 3**i
+		stride *= 3
+		sizes[i] = size
 
-	'''
-	order_of_convergence = -np.log(errors[-2]/errors[-1])/np.log(mesh_sizes[-2]*1./mesh_sizes[-1])
+	h = 0.4-y_right[:]
+	np.set_printoptions(6)
+	print "{}\t{}".format(sizes[0], h),
+	observed_rates[0:] = (np.log(error_norms[1:])-np.log(error_norms[0:-1]))/np.log(1.0/3)
+	best_fit_rate = -np.polyfit(np.log(sizes), np.log(error_norms), 1)[0]
+	theoretical_rates[0:] = 1 + np.log(h[0:-1]/h[1:])/np.log(3.0)
+	np.set_printoptions(3)
+	print "\t{}\t{:.3f}\t{}".format(observed_rates, best_fit_rate, theoretical_rates)
 
-	first_order = np.array([0.5*errors[0], 0.5*errors[0]*(mesh_sizes[-1]/mesh_sizes[0])**(-1)])
-	second_order = np.array([0.5*errors[0], 0.5*errors[0]*(mesh_sizes[-1]/mesh_sizes[0])**(-2)])
-	x_coords = np.array([mesh_sizes[0], mesh_sizes[-1]])
-	
-	if interp_type=="constant":
-		TITLE = "Assign the wall velocity to the nearest node"
-	elif interp_type=="linear":
-		TITLE = "Linear interpolation to the node nearest to the wall"
-
-	plt.loglog(mesh_sizes, errors, 'o-', label='Numerical error (%1.2f)' % (order_of_convergence))
-	plt.loglog(x_coords, first_order, label="First-order convergence")
-	plt.loglog(x_coords, second_order, label="Second-order convergence")
-	plt.xlabel('Mesh size')
-	plt.ylabel('Error')
-	plt.title(TITLE)
-	plt.legend()
-	plt.savefig("%s/convergence.png" % (PATH))
-	'''
-
-def three_grid_convergence(start_size, interp_type, folder):
+def three_grid_convergence(start_size, interp_type, num_grids, folder):
 	PATH = '1D-Steady/%s/%s/three_grid' % (interp_type, folder)
-	print "%d: " % start_size,
-	NUM_GRIDS = 4
-	u = [[]]*NUM_GRIDS
-	diffs = np.zeros(NUM_GRIDS-1)
-	y_left  = np.zeros(NUM_GRIDS)
-	y_right = np.zeros(NUM_GRIDS)
-	for i in range(NUM_GRIDS):
+	u = [[]]*num_grids
+	diffs = np.zeros(num_grids-1)
+	sizes = np.zeros(num_grids-1, dtype=int)
+	observed_rates = np.zeros(num_grids-2)
+	theoretical_rates = np.zeros(num_grids-2)
+	y_left  = np.zeros(num_grids)
+	y_right = np.zeros(num_grids)
+	start0 = 0
+	stride0 = 1
+	for i in range(num_grids):
 		size = start_size*(3**i)
 		u[i], _, y_left[i], y_right[i] = steady_channel_flow(N=size, interp=interp_type, folder=PATH)
-
-	diffs[0] = la.norm(u[1][1::3]-u[0])
-	diffs[1] = la.norm(u[2][4::9]-u[1][1::3])
-	diffs[2] = la.norm(u[3][13::27]-u[2][4::9])
-
-	print "%1.4f, %1.4f" % (np.log(diffs[0]/diffs[1])/np.log(3), np.log(diffs[1]/diffs[2])/np.log(3))
-	print y_right
-	print diffs
-
-	h = 1./start_size
-	y = np.linspace(-0.5+h/2., 0.5-h/2., start_size)
-	plt.ioff()
-	plt.clf()
-	plt.plot(y, u[0], label="grid0")
-	plt.plot(y, u[1][1::3], label="grid1")
-	plt.plot(y, u[2][4::9], label="grid2")
-	plt.plot(y, u[3][13::27], label="grid3")
-	plt.axis([-0.5,0.5,0,1.5*0.64])
-	plt.legend()
-	plt.savefig('%s/three-grid.png' % (PATH))
-	plt.clf()
+		if i>0:
+			start1  = start0 + 3**(i-1)
+			stride1 = stride0*3
+			diffs[i-1] = la.norm(u[i][start1::stride1] - u[i-1][start0::stride0])
+			sizes[i-1] = size
+			start0  = start1
+			stride0 = stride1
+	
+	h = 0.4-y_right[:]
+	np.set_printoptions(6)
+	print "{}\t{}".format(sizes[0]/3, h),
+	observed_rates[0:] = (np.log(diffs[1:])-np.log(diffs[0:-1]))/np.log(1.0/3)
+	best_fit_rate = -np.polyfit(np.log(sizes), np.log(diffs), 1)[0]
+	theoretical_rates[0:] = 1 + np.log((h[1:-1]-3*h[0:-2])/(h[2:]-3*h[1:-1]))/np.log(3.0)
+	np.set_printoptions(3)
+	print "\t{}\t{:.3f}\t{}".format(observed_rates, best_fit_rate, theoretical_rates)
 
 if __name__=="__main__":
 	START = 10
 	END = 21
 	INTERP = "linear"
+	NUM_GRIDS = 5
+	print "\nTwo-grid convergence"
 	for size in range(START,END):
 		FOLDER = str(size) + '-' + INTERP
-		two_grid_convergence(size, INTERP, FOLDER)
-		three_grid_convergence(size, INTERP, FOLDER)
-		print " "
+		two_grid_convergence(size, INTERP, NUM_GRIDS, FOLDER)
+	print "\nThree-grid convergence"
+	for size in range(START,END):
+		FOLDER = str(size) + '-' + INTERP
+		three_grid_convergence(size, INTERP, NUM_GRIDS, FOLDER)

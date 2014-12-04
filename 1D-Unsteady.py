@@ -9,7 +9,12 @@ import matplotlib.pyplot as plt
 import os
 import errno
 
-def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=400, dt=0.001, folder="new"):
+y_left_wall  = -0.4
+y_right_wall = +0.4
+width = y_right_wall - y_left_wall
+y_origin = (y_left_wall+y_right_wall)/2.
+
+def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=800, dt=0.001, folder="new"):
 	try:
 		os.makedirs(folder)
 	except OSError as exc:
@@ -21,17 +26,16 @@ def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=400, dt=0
 	h = 1./N
 	y = np.linspace(-0.5+h/2., 0.5-h/2., N)
 	mask = np.ones(N)
-	width = 0.8
 	
 	left = 0
-	while y[left]+eps < -width/2.:
+	while y[left]+eps < y_left_wall:
 		left+=1
-	xi_left = (y[left]+width/2.)/(y[left]+width/2.+h)
+	xi_left = (y[left]-y_left_wall)/(y[left]-y_left_wall+h)
 	
 	right = N-1
-	while y[right]-eps > width/2.:
+	while y[right]-eps > y_right_wall:
 		right-=1
-	xi_right = (width/2.-y[right])/(width/2.-y[right]+h)
+	xi_right = (y_right_wall-y[right])/(y_right_wall-y[right]+h)
 
 	for i in xrange(len(mask)):
 		if i<left or i>right:
@@ -39,7 +43,7 @@ def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=400, dt=0
 
 	u = np.zeros(N)
 	uExact = np.zeros(N)
-	uExact[:] = dpdx/nu/8.*(4*y[:]*y[:]-width**2)
+	uExact[:] = dpdx/nu/8.*(4*(y[:]-y_origin)*(y[:]-y_origin)-width**2)
 
 	# matrix
 	rows = np.zeros(3*N, dtype=np.int)
@@ -93,45 +97,49 @@ def unsteady_channel_flow(N=20, nu=.125, dpdx=-1., interp='linear', nt=400, dt=0
 	plt.axis([-0.5,0.5,0,-dpdx/nu/8*width*width*1.5])
 	plt.savefig('%s/mesh-%d.png' % (folder, N))
 
-	return u*mask, la.norm((u-uExact)*mask)/la.norm(uExact*mask), y[left], y[right]
+	return u*mask, y[left], y[right]
 
-def three_grid_convergence(start_size, interp_type, folder):
+def three_grid_convergence(start_size, interp_type, num_grids, folder):
 	PATH = '1D-Unsteady/%s/%s/three_grid' % (interp_type, folder)
-	print "%d: " % start_size,
-	NUM_GRIDS = 4
+	NUM_GRIDS = num_grids
 	u = [[]]*NUM_GRIDS
 	diffs = np.zeros(NUM_GRIDS-1)
+	sizes = np.zeros(NUM_GRIDS-1, dtype=int)
+	observed_rates = np.zeros(NUM_GRIDS-2)
+	theoretical_rates_right = np.zeros(NUM_GRIDS-2)
+	theoretical_rates_left  = np.zeros(NUM_GRIDS-2)
 	y_left  = np.zeros(NUM_GRIDS)
 	y_right = np.zeros(NUM_GRIDS)
+	start0 = 0
+	stride0 = 1
 	for i in range(NUM_GRIDS):
 		size = start_size*(3**i)
-		u[i], _, y_left[i], y_right[i] = unsteady_channel_flow(N=size, interp=interp_type, folder=PATH)
+		u[i], y_left[i], y_right[i] = unsteady_channel_flow(N=size, interp=interp_type, folder=PATH)
+		if i>0:
+			start1  = start0 + 3**(i-1)
+			stride1 = stride0*3
+			diffs[i-1] = la.norm(u[i][start1::stride1] - u[i-1][start0::stride0])
+			sizes[i-1] = len(u[i])
+			start0  = start1
+			stride0 = stride1
 
-	diffs[0] = la.norm(u[1][1::3]-u[0])
-	diffs[1] = la.norm(u[2][4::9]-u[1][1::3])
-	diffs[2] = la.norm(u[3][13::27]-u[2][4::9])
-
-	print "%1.4f, %1.4f" % (np.log(diffs[0]/diffs[1])/np.log(3), np.log(diffs[1]/diffs[2])/np.log(3))
-	print y_right
-	print diffs
-
-	h = 1./start_size
-	y = np.linspace(-0.5+h/2., 0.5-h/2., start_size)
-	plt.ioff()
-	plt.clf()
-	plt.plot(y, u[0], label="grid0")
-	plt.plot(y, u[1][1::3], label="grid1")
-	plt.plot(y, u[2][4::9], label="grid2")
-	plt.plot(y, u[3][13::27], label="grid3")
-	plt.axis([-0.5,0.5,0,1.5*0.64])
-	plt.legend()
-	plt.savefig('%s/three-grid.png' % (PATH))
+	h_right = y_right_wall-y_right[:]
+	h_left  = y_left[:]-y_left_wall
+	np.set_printoptions(6)
+	print "{}: {} {},".format(sizes[0]/3, h_left, h_right),
+	observed_rates[0:] = (np.log(diffs[1:])-np.log(diffs[0:-1]))/np.log(1.0/3)
+	best_fit_rate = -np.polyfit(np.log(sizes), np.log(diffs), 1)[0]
+	theoretical_rates_left[0:] = 1 + np.log((h_left[1:-1]-3*h_left[0:-2])/(h_left[2:]-3*h_left[1:-1]))/np.log(3.0)
+	theoretical_rates_right[0:] = 1 + np.log((h_right[1:-1]-3*h_right[0:-2])/(h_right[2:]-3*h_right[1:-1]))/np.log(3.0)
+	np.set_printoptions(3)
+	print "   Expt: {} {:.3f},   Theory: left: {} right: {}".format(observed_rates, best_fit_rate, theoretical_rates_left, theoretical_rates_right)
 
 if __name__=="__main__":
 	START = 10
 	END = 21
 	INTERP = "linear"
+	NUM_GRIDS = 4
+	print "\nThree-grid convergence"
 	for size in range(START,END):
 		FOLDER = str(size) + '-' + INTERP
-		three_grid_convergence(size, INTERP, FOLDER)
-		print " "
+		three_grid_convergence(size, INTERP, NUM_GRIDS, FOLDER)
